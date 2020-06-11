@@ -1,11 +1,7 @@
-cmake_minimum_required(VERSION 3.0.0)
-project(pov_system VERSION 0.1.0)
+cmake_minimum_required(VERSION 3.17)
+project(pov_system)
 
-include(CTest)
-enable_testing()
-
+add_subdirectory(lib/pixel_reader)
 add_executable(pov_system main.cpp)
 
-set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
-include(CPack)
+target_link_libraries(pov_system PRIVATE pixel_reader)
