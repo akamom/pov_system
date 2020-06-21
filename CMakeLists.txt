@@ -6,5 +6,4 @@ add_subdirectory(lib/pixel_reader)
 
 add_executable(pov_system main.cpp)
 
-target_link_libraries(pixel_reader PRIVATE lodepng)
 target_link_libraries(pov_system PRIVATE pixel_reader)
