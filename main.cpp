@@ -7,10 +7,11 @@ int main(int, char**) {
     //forloop(pxl.size()){
     //    std::cout << (int)pxl[i] << ((i+1)%4==0 ? "\n":",");
     //}
-
     /// MEINE NEUE METHODE
     auto pixels = std::vector<color>();
     bool err = pixel::decodeWithState("/Users/i519401/Downloads/test.png", pixels);
-    for(auto col : pixels)
+    for(auto col : pixels){
         col.print();
+    }
+    std::system("ls");
 }
