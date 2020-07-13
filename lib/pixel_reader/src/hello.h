@@ -9,7 +9,7 @@ struct color{
     color(int r, int g, int b, int a) : R{r}, G{g}, B{b}, A{a} {}
     int R, G, B, A;
     void print(){
-        std::cout << ("R: ") << R << "\tG: " << G << "\tB: " << B << "\tA: " << A << std::endl;
+        std::cout << ("\033[1;31mR: \033[0m") << R << "\t\033[1;32mG: \033[0m" << G << "\t\033[1;96mB: \033[0m" << B << "\tA: \033[0m" << A << std::endl;
     }
 };
 
