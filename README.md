@@ -32,3 +32,8 @@ Root: pov
     pov stop
 
 Alpha = 0: RGB: 0 (also schwarzer Pixel (alles über A>0: originale RGB Farbe))
+
+
+## Debugging with VS Code
+For quick debugging, please use the VS Compiler.
+Further information can be found on the [CMake Tools Documentation Page](https://vector-of-bool.github.io/docs/vscode-cmake-tools/debugging.html).
