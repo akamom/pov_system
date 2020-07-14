@@ -15,18 +15,18 @@ struct color{
 
 namespace pixel {
     imgVector decodeTwoSteps(const char* filename) {
-    std::vector<unsigned char> png;
-    std::vector<unsigned char> image; //the raw pixels
-    unsigned width, height;
+        std::vector<unsigned char> png;
+        std::vector<unsigned char> image; //the raw pixels
+        unsigned width, height;
 
-    //load and decode
-    unsigned error = lodepng::load_file(png, filename);
-    if(!error) error = lodepng::decode(image, width, height, png);
+        //load and decode
+        unsigned error = lodepng::load_file(png, filename);
+        if(!error) error = lodepng::decode(image, width, height, png);
 
-    //if there's an error, display it
-    if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+        //if there's an error, display it
+        if(error) std::cout << "decoder error " << error << ": " << lodepng_error_text(error) << std::endl;
 
-    return image;
+        return image;
 
     //the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as texture, draw it, ...
     }
