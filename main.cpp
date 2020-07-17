@@ -2,7 +2,18 @@
 #include "pixel_reader.h"
 #include <Map>
 
-typedef std::map<std::string, std::string> cmdMap_t;
+// if 'debug' more verbose console
+#define debug
+
+// key: commandname, value: description, parameterlist
+typedef std::map<std::string, std::pair<std::string, std::vector<std::string>>> cmdMap_t;
+
+// current path
+// TODO: hier noch einen standart pfad angeben!
+std::string currentPath = "C:/irgendeinPfadDenEsNichtAufAllenSystemenGibt/";
+// all commands will be <rootCommand> + <command>
+const std::string rootCommand = "pov";
+const std::string quitCommand = "q";
 
 // system specific console commands
 int getOs(){
@@ -37,8 +48,7 @@ std::string trimString(std::string& str)
 
 std::vector<std::string> split(std::string s, std::string delimiter){
     std::vector<std::string> list;
-    // for char *phrase:
-    //std::string s = std::string(phrase);
+    // for char *phrase: std::string s = std::string(phrase);
     size_t pos = 0;
     std::string token;
     while ((pos = s.find(delimiter)) != std::string::npos) {
@@ -51,6 +61,43 @@ std::vector<std::string> split(std::string s, std::string delimiter){
     return list;
 }
 
+class ImageSelection_c{
+public:
+    ImageSelection_c(){
+        m_pixelSelection = std::map<std::string, std::vector<color>>();
+        m_pathSelection = std::map<std::string, std::string>();
+    }
+    ~ImageSelection_c(){}
+
+    void addImage(std::string fileName){
+        // check ob path + file existiert
+
+        // pixel extrahieren
+        // check ob pixel extrahiert werden konnten
+    }
+    void addImage(std::string fileName, int atIndex){}
+    void removeImage(std::string fileName){}
+    void removeImage(int atIndex){
+        if (atIndex >= m_pixelSelection.size())
+            return;
+        //m_pixelSelection.erase(m_pixelSelection.begin() + 0);
+    }
+
+    void printSelection(){
+        int index = 0;
+        std::cout << "---- current image selection: ----\n";
+        for(std::map<std::string, std::vector<color>>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
+            std::cout << index << ": " << it->first << std::endl;
+            ++index;
+        }
+        std::cout << "----------------------------------\n";
+    }
+private:
+    std::map<std::string, std::string>          m_pathSelection;
+    // selection of images. key: path+imagename, value: conversed pixels
+    std::map<std::string, std::vector<color>>   m_pixelSelection;
+};
+
 class ParameterParser_c{
 public:
     std::string baseCommand;
@@ -60,6 +107,8 @@ public:
         m_parameters = std::map<std::string, std::string>();
         getParametersFromCommand();
     }
+
+    ~ParameterParser_c(){}
 
     bool getParameter(std::string param_name, std::string &param_value) const{
         if (m_parameters.empty())
@@ -89,8 +138,6 @@ private:
         if (rawSplit.size() <= 2)
             return;
 
-        //rawSplit.erase(rawSplit.begin());
-        //rawSplit.erase(rawSplit.begin()+1);
         for(std::vector<std::string>::iterator it = rawSplit.begin()+2; it != rawSplit.end(); ++it){
             auto paramSplit = split(*it, this->splitSymbol);
             if (paramSplit.size() != 2)
@@ -136,37 +183,38 @@ void gotoDirectory(char* dir){
     std::system(strcat(gotoDirectoryCommand, dir));
 }
 
-// current path
-// TODO: hier noch einen standart pfad angeben!
-std::string currentPath = "C:/irgendeinPfadDenEsNichtAufAllenSystemenGibt/";
-// all commands will be <rootCommand> + <command>
-const std::string rootCommand = "pov";
-const std::string quitCommand = "q";
 // commands as map (only used in help screen!)
 // key: string as command, value: string as description
 cmdMap_t commandMap = {
-    {"help", "lists all commands"},
-    {"goto", "sets the current working path"},
-    {"add", "adds image to selection"},
-    {"remove", "removes image from selection either by index or by name"},
-    {"list", "lists all selected images and index"}
+    {"help", {"lists all commands", {}}},
+    {"goto", {"sets the current working path", {"optional: <path=[path]>: path as value"}}},
+    {"add", {"adds image to selection", {"mandatory: <file=[filename]>: file in current path", "optional: <index=[index]>: at which index to insert"}}},
+    {"remove", {"removes image from selection either by index or by name", {}}},
+    {"status", {"lists all selected images and index", {}}}
 };
 
 void printHelp(){
     std::cout << "-----------POV Help Page------------\n" << "Current Path: " << currentPath << std::endl;
     std::cout << "Selected Items: \n";
     for (cmdMap_t::iterator it = commandMap.begin(); it != commandMap.end(); ++it){
-        std::cout << "\033[1;31m"<< it->first <<": \033[0m" << it->second << std::endl;
+        std::cout << "\033[1;31m"<< it->first <<": \033[0m" << it->second.first << std::endl;
+        for (int i = 0; i<it->second.second.size(); i++){
+            std::cout << "\t" << it->second.second[i] << std::endl;
+        }
     }
     std::cout << "--------------------------------------\n";
 }
+
+auto selection = ImageSelection_c();
 
 // siehe unten. So ähnlich aber dann halt in der Map
 void* exeHelp = &printHelp;
 bool evaluateCommand(std::string cmd){
     auto paramParser = ParameterParser_c(cmd);
     auto base = paramParser.baseCommand;
-    std::cout << base << std::endl;
+    #ifdef debug
+        std::cout << base << std::endl;
+    #endif
     // TODO: optionen des Commands wie z.B. pov goto <Pfad> müssen extrahiert werden
     // TODO: in die commandMap iwie void* einfügen und falls cmd == key, dann void* methode aufrufen?
     if (base == (rootCommand+" help")){
@@ -191,6 +239,9 @@ bool evaluateCommand(std::string cmd){
         return true;
     } else if (base == (rootCommand+" remove")){
         return true;
+    } else if (base == (rootCommand+" status")){
+        selection.printSelection();
+        return true;
     }
 
     return false;
@@ -213,16 +264,15 @@ int main(int, char**) {
     listItemsInDirectory();
     */
 
-   //for (auto str : split("  pov    is coool", " ")){
-   //    std::cout << "'" << str << "'\n";
-   //}
-
-    std::cout << "\033[1menter '"<< quitCommand <<"' to quit. enter 'pov help' to list available commands\033[0m\n";
+    //for (auto str : split("  pov    is coool", " ")){
+    //    std::cout << "'" << str << "'\n";
+    //}
+    std::cout << "\033[1m >>>>> POV Enviroment Start\n";
+    std::cout << "enter '"<< quitCommand <<"' to quit. enter 'pov help' to list available commands\033[0m\n";
     // last user input
     std::string lastInput = "";
     // programm loop
     do{
-        //std::cout << "\033[1;32m<" << currentPath << ">: \033[0m";
         std::cout << "\033[1;32m<" << currentPath << ">: \033[0m";
         std::getline(std::cin, lastInput);
         lastInput = trimString(lastInput);
@@ -234,7 +284,7 @@ int main(int, char**) {
         if (!cmdfound)
             std::cout << "Command "<< lastInput <<" not found\n";
 
-        std::cout << "\n";
     }while(lastInput != quitCommand);
-    std::cout << "Quitting";
+    std::cout << "\033[1mQuitting...\n";
+    std::cout << ">>>>> POV Enviroment Exit\033[0m\n";
 }

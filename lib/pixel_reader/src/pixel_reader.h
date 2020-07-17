@@ -31,6 +31,8 @@ namespace pixel {
     //the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as texture, draw it, ...
     }
 
+    const int heightRestriction = 10;
+    const int widthRestriction = 10;
     //Example 3
     //Load PNG file from disk using a State, normally needed for more advanced usage.
     bool decodeWithState(const char* filename, std::vector<color> &pixels) {
@@ -41,16 +43,20 @@ namespace pixel {
 
         unsigned error = lodepng::load_file(png, filename); //load the image file with given filename
         if(!error) error = lodepng::decode(image, width, height, state, png);
-        std::cout << "width= " << width << " height= " << height << std::endl;
+        //std::cout << "width= " << width << " height= " << height << std::endl;
+        if (width != widthRestriction || height != heightRestriction){
+            std::cout << "\033[1;202mImage dimensions are width=" << width << " , height=" << height << " . \nHowever, dimensions must be width=" << widthRestriction << " and height=" << heightRestriction << "\033[0m\n";
+            return false;
+        }
 
         //if there's an error, display it
         if(error){
-            std::cout << "decoder error " << error << ": "<< lodepng_error_text(error) << std::endl;
+            std::cout << "\033[1;202mDECODER ERROR: " << error << ": "<< lodepng_error_text(error) << "\033[0m\n";
             return false;
         }
 
         if(image.size()%4 != 0){
-            std::cout << "incorrect pixel count\n";
+            std::cout << "\033[1;202mCONVERSION ERROR: inconsistent pixel count!\033[0m\n";
             return false;
         }
 
