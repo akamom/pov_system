@@ -214,12 +214,12 @@ void loop() {
             mpu.dmpGetQuaternion(&q, fifoBuffer);
             mpu.dmpGetGravity(&gravity, &q);
             mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-            //Serial.print("ypr\t");
-            //Serial.print(ypr[0] * 180/M_PI);
-            //Serial.print("\t");
-            //Serial.print(ypr[1] * 180/M_PI);
-            //Serial.print("\t");
-            //Serial.println(ypr[2] * 180/M_PI);
+            Serial.print("ypr\t");
+            Serial.print(ypr[0] * 180/M_PI);
+            Serial.print("\t");
+            Serial.print(ypr[1] * 180/M_PI);
+            Serial.print("\t");
+            Serial.println(ypr[2] * 180/M_PI);
         #endif
       yaw = ypr[0] * 180/M_PI;
       if(yaw >= 0 && yaw < 20){
