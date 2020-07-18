@@ -1,16 +1,18 @@
 #include <iostream>
 #include "pixel_reader.h"
 #include <Map>
+// stat works on unix, linux and windows
+#include <sys/stat.h>
 
 // if 'debug' more verbose console
-#define debug
+#define DEBUG
 
 // key: commandname, value: description, parameterlist
 typedef std::map<std::string, std::pair<std::string, std::vector<std::string>>> cmdMap_t;
 
 // current path
 // TODO: hier noch einen standart pfad angeben!
-std::string currentPath = "C:/irgendeinPfadDenEsNichtAufAllenSystemenGibt/";
+std::string currentPath = "D:/";
 // all commands will be <rootCommand> + <command>
 const std::string rootCommand = "pov";
 const std::string quitCommand = "q";
@@ -34,8 +36,31 @@ int getOs(){
 #endif
 }
 
+// https://stackoverflow.com/questions/18100097/portable-way-to-check-if-directory-exists-windows-linux-c
+inline bool directoryExists(const std::string &dir){
+    struct stat info;
+    char *pathname = strdup(dir.c_str());
+
+    if( stat( pathname, &info ) != 0 ){
+        std::cout << pathname << " cannot be accessed!\n";
+        return false;
+    }
+    else if( info.st_mode & S_IFDIR )  // S_ISDIR() doesn't exist on my windows 
+        return true;
+    else{
+        std::cout << pathname << " is not directory!\n";
+        return false;
+    }
+}
+
+// https://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exist-using-standard-c-c11-c
+inline bool fileExists(const std::string &name) {
+  struct stat buffer;   
+  return (stat (name.c_str(), &buffer) == 0); 
+}
+
 // https://stackoverflow.com/questions/25829143/trim-whitespace-from-a-string/25829178
-std::string trimString(std::string& str)
+std::string trimString(const std::string &str)
 {
     size_t first = str.find_first_not_of(' ');
     if (std::string::npos == first)
@@ -44,6 +69,26 @@ std::string trimString(std::string& str)
     }
     size_t last = str.find_last_not_of(' ');
     return str.substr(first, (last - first + 1));
+}
+
+void correctPath(std::string &path) {
+    // replaces all occurences of \ with /, and removes multiple backslashes
+    char lastChar = 'a';
+    const char ch1 = '\\';
+    const char ch2 = '/';
+    for (int i = 0; i < path.length(); ++i) {
+        if (lastChar == ch1 && path[i] == ch1){
+            // remove double backslashes
+            //path[i] = (char)0;
+            path.erase(i, 1);
+            continue;
+        }
+        lastChar = path[i];
+        if (path[i] == ch1){
+            // replace backslash with slash
+            path[i] = ch2;
+        }
+    }
 }
 
 std::vector<std::string> split(std::string s, std::string delimiter){
@@ -64,20 +109,45 @@ std::vector<std::string> split(std::string s, std::string delimiter){
 class ImageSelection_c{
 public:
     ImageSelection_c(){
-        m_pixelSelection = std::map<std::string, std::vector<color>>();
+        // m_pixelSelection = std::map<std::string, std::vector<color>>();
+        m_pixelSelection = std::map<std::string, std::string>();
         m_pathSelection = std::map<std::string, std::string>();
     }
     ~ImageSelection_c(){}
 
-    void addImage(std::string fileName){
-        // check ob path + file existiert
+    void addImage(const std::string fileName){
+        // build full pathname
+        auto completeFileName = trimString(currentPath + fileName);
+        auto exists = fileExists(completeFileName);
+        // file existent?
+        if (!exists){
+            std::cout << completeFileName << " does not exist!\n";
+            return;
+        }
+        // file already in selection
+        if (m_pixelSelection.find(completeFileName) != m_pixelSelection.end()){
+            std::cout << completeFileName << " is already selected\n";
+            return;
+        }
 
-        // pixel extrahieren
+        // extract pixel data
+        auto pixels = std::vector<color>();
+        bool succeeded = pixel::decodeWithState(completeFileName.c_str(), pixels);
         // check ob pixel extrahiert werden konnten
+        if (!succeeded){
+            std::cout << "cannot add " << completeFileName << " to selection\n";
+            return;
+        }
+
+        auto tranformed = pixelsToBools(pixels);
+
+        // add to selection
+        //m_pixelSelection.insert({completeFileName, pixels});
+        m_pixelSelection.insert({completeFileName, tranformed});
     }
-    void addImage(std::string fileName, int atIndex){}
-    void removeImage(std::string fileName){}
-    void removeImage(int atIndex){
+    void addImage(const std::string fileName, const int atIndex){}
+    void removeImage(const std::string fileName){}
+    void removeImage(const int atIndex){
         if (atIndex >= m_pixelSelection.size())
             return;
         //m_pixelSelection.erase(m_pixelSelection.begin() + 0);
@@ -86,8 +156,12 @@ public:
     void printSelection(){
         int index = 0;
         std::cout << "---- current image selection: ----\n";
-        for(std::map<std::string, std::vector<color>>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
-            std::cout << index << ": " << it->first << std::endl;
+        //for(std::map<std::string, std::vector<color>>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
+        //    std::cout << index << ": " << it->first << std::endl;
+        //    ++index;
+        //}
+        for(std::map<std::string, std::string>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
+            std::cout << index << ": " << it->first << " Farben: " << it->second << std::endl;
             ++index;
         }
         std::cout << "----------------------------------\n";
@@ -95,7 +169,23 @@ public:
 private:
     std::map<std::string, std::string>          m_pathSelection;
     // selection of images. key: path+imagename, value: conversed pixels
-    std::map<std::string, std::vector<color>>   m_pixelSelection;
+    std::map<std::string, std::string>  m_pixelSelection;
+    // std::map<std::string, std::vector<color>>   m_pixelSelection;
+
+    std::string pixelsToBools(std::vector<color> pix){
+        //auto transformed = std::vector<bool>();
+        std::string asstring = "";
+        for (auto &a:pix){
+            size_t rgbscalar = a.R + a.B + a.G; // ignore alpha
+            bool t = rgbscalar != 0;
+            //transformed.push_back(t); // only if black then 0, all other colors will be 1
+            //asstring.push_back(t ? '\u25fb' : '\u25fc');
+            asstring.push_back(t ? '1' : '0');
+            asstring.push_back(';');
+        }
+        //return transformed;
+        return asstring;
+    }
 };
 
 class ParameterParser_c{
@@ -212,7 +302,7 @@ void* exeHelp = &printHelp;
 bool evaluateCommand(std::string cmd){
     auto paramParser = ParameterParser_c(cmd);
     auto base = paramParser.baseCommand;
-    #ifdef debug
+    #ifdef DEBUG
         std::cout << base << std::endl;
     #endif
     // TODO: optionen des Commands wie z.B. pov goto <Pfad> müssen extrahiert werden
@@ -232,10 +322,31 @@ bool evaluateCommand(std::string cmd){
             return false;
         // else path command is there and we use the value
         // TODO: check ob pfad existiert
-        currentPath = path;
+        correctPath(path);
+        auto exists = directoryExists(path);
+        if (exists)
+            currentPath = path;
         //listItemsInDirectory(strdup(path.c_str()));
         return true;
     } else if (base == (rootCommand+" add")){
+        std::string filename = "";
+        bool gotValue = paramParser.getParameter("file", filename);
+        if (!gotValue)
+            return false;
+        auto splitfilename = split(filename, ".");
+        auto fileextension = splitfilename[splitfilename.size()-1];
+        //auto fileextension = *(splitfilename.end()-1);
+        for (auto a : splitfilename){
+            std::cout << a << std::endl;
+        }
+        if (fileextension != "png")
+            filename += ".png";
+        #ifdef DEBUG
+            std::cout << fileextension << std::endl;
+            std::cout << filename << std::endl;
+        #endif
+        
+        selection.addImage(filename);
         return true;
     } else if (base == (rootCommand+" remove")){
         return true;
@@ -267,6 +378,17 @@ int main(int, char**) {
     //for (auto str : split("  pov    is coool", " ")){
     //    std::cout << "'" << str << "'\n";
     //}
+
+    /*
+    std::string pat = "D:\\1STUDIUM\\Semester3_klausuren.pdf";
+    correctPath(pat);
+    std::cout << fileExists(pat) << std::endl;
+    std::cout << fileExists("D:/1STUDIUM/Semester3_klauafqfsuren.pdf") << std::endl;
+    std::cout << directoryExists("D:/1STUDIUM") << std::endl;
+    std::cout << directoryExists("D:/1STUDIUM qgfqg") << std::endl;
+    return 1;
+    */
+
     std::cout << "\033[1m >>>>> POV Enviroment Start\n";
     std::cout << "enter '"<< quitCommand <<"' to quit. enter 'pov help' to list available commands\033[0m\n";
     // last user input
