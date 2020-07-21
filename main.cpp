@@ -12,7 +12,7 @@ typedef std::map<std::string, std::pair<std::string, std::vector<std::string>>> 
 
 // current path
 // TODO: hier noch einen standart pfad angeben!
-std::string currentPath = "D:/";
+std::string currentPath = "C:/";
 // all commands will be <rootCommand> + <command>
 const std::string rootCommand = "pov";
 const std::string quitCommand = "q";
@@ -89,21 +89,55 @@ void correctPath(std::string &path) {
             path[i] = ch2;
         }
     }
+    if (path[path.length()-1] != '/')
+        path.append("/");
 }
 
-std::vector<std::string> split(std::string s, std::string delimiter){
-    std::vector<std::string> list;
-    // for char *phrase: std::string s = std::string(phrase);
-    size_t pos = 0;
-    std::string token;
-    while ((pos = s.find(delimiter)) != std::string::npos) {
-        token = s.substr(0, pos);
-        if (token != "")
-            list.push_back(token);
-        s.erase(0, pos + delimiter.length());
-    }
-    list.push_back(s);
-    return list;
+std::vector<std::string> split(std::string s, std::string delimiter, bool ignore_inside_string = false){
+	const auto string_space_replacement = '$';
+    // automatically check if there is a need to check for strings
+    if (s.find('"') == std::string::npos)
+        ignore_inside_string = true;
+
+	if (!ignore_inside_string)
+	{
+		// replace space inside string with replacement char
+		auto is_inside_string = false;
+		for(auto i = 0; i<s.length(); i++)
+		{
+			const auto c = s[i];
+			if (c == '"')
+			{
+				is_inside_string = !is_inside_string;
+				s.erase(i, 1);
+			}
+			if (c == ' ' && is_inside_string)
+				s[i] = string_space_replacement;
+		}
+	}
+
+	// append delimiter to iterate through all split string not all-1
+	s.append(delimiter);
+	std::vector<std::string> list;
+	size_t pos;
+	while ((pos = s.find(delimiter)) != std::string::npos) {
+		auto token = s.substr(0, pos);
+		if (!token.empty())
+		{
+			if (!ignore_inside_string)
+			{
+				// replace replacement char with space again
+				size_t space_replace_pos;
+				while ((space_replace_pos = token.find(string_space_replacement)) != std::string::npos)
+				{
+					token[space_replace_pos] = ' ';
+				}
+			}
+			list.push_back(token);
+		}
+		s.erase(0, pos + delimiter.length());
+	}
+	return list;
 }
 
 class ImageSelection_c{
@@ -148,9 +182,18 @@ public:
     void addImage(const std::string fileName, const int atIndex){}
     void removeImage(const std::string fileName){}
     void removeImage(const int atIndex){
-        if (atIndex >= m_pixelSelection.size())
+        if (atIndex >= m_pixelSelection.size()){
+            std::cout << "index out of bounds\n";
             return;
-        //m_pixelSelection.erase(m_pixelSelection.begin() + 0);
+        }
+        auto index = 0;
+        for(std::map<std::string, std::string>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
+            if (atIndex == index){
+                m_pixelSelection.erase(it);
+                break;
+            }
+            ++index;
+        }
     }
 
     void printSelection(){
@@ -206,7 +249,7 @@ public:
         std::map<std::string, std::string>::const_iterator it = m_parameters.find(param_name); //m_parameters.at(param_name);
         // meaning key non existent
         if (it == m_parameters.end()){
-            std::cout << "der parameter " << param_name << " existiert nicht!\n";
+            std::cout << "parameter " << param_name << " does not exist!\n";
             return false;
         }
         param_value = it->second;
@@ -219,6 +262,11 @@ private:
     void getParametersFromCommand(){
         auto rawSplit = split(this->originalCommand, " ");
         // not even baseCommand input
+        #ifdef DEBUG
+        for (auto e : rawSplit){
+            std::cout << e << std::endl;
+        }
+        #endif
         if (rawSplit.size() < 2)
             return;
         // first 2 are mandatory commands
@@ -229,7 +277,13 @@ private:
             return;
 
         for(std::vector<std::string>::iterator it = rawSplit.begin()+2; it != rawSplit.end(); ++it){
-            auto paramSplit = split(*it, this->splitSymbol);
+            auto paramSplit = split(*it, this->splitSymbol, true);
+            #ifdef DEBUG
+            std::cout << "param: " << *it << std::endl;
+            for (auto e : paramSplit){
+                std::cout << "paramsplit " << e << std::endl;
+            }
+            #endif
             if (paramSplit.size() != 2)
                 continue;
             auto name = trimString(paramSplit.at(0));
@@ -316,7 +370,7 @@ bool evaluateCommand(std::string cmd){
         //gotoDirectory("C:/Users/olitw/Downloads");
         std::string path = "";
         bool gotValue = paramParser.getParameter("path", path);
-        std::cout << path << std::endl;
+        std::cout << "goto directory: "<< path << std::endl;
         // if error, parameter was not found, meaning invalid parameter command
         if (!gotValue)
             return false;
@@ -349,6 +403,12 @@ bool evaluateCommand(std::string cmd){
         selection.addImage(filename);
         return true;
     } else if (base == (rootCommand+" remove")){
+        std::string index;
+        bool gotValue = paramParser.getParameter("i", index);
+        if (!gotValue)
+            return false;
+        int index_from_string = std::stoi(index);
+        selection.removeImage(index_from_string);
         return true;
     } else if (base == (rootCommand+" status")){
         selection.printSelection();
