@@ -13,7 +13,8 @@ TODO: list files in directory
 #include <Map>
 // stat works on unix, linux and windows
 #include <sys/stat.h>
-#include <dirent.h>
+// #include <dirent.h>
+#include "resources/dirent.h"
 // only available in c++ 17 and upgraded compiler
 // #include <filesystem>
 
