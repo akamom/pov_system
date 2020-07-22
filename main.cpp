@@ -7,6 +7,7 @@ TODO: Console Farben testen und vllt sogar rausnehmen
 TODO: list files in directory
 TODO: Bluetooth?
 TODO: dirent.h auf Windows ausprobieren (list items in directory)
+TODO: parameter like onlypng (with no value) or somth for dir coommand so that only png is listed
 */
 
 #include <iostream>
@@ -15,7 +16,7 @@ TODO: dirent.h auf Windows ausprobieren (list items in directory)
 #include <Map>
 // stat works on unix, linux and windows
 #include <sys/stat.h>
-#include <dirent.h>
+#include "resources/dirent.h"
 // only available in c++ 17 and upgraded compiler
 // #include <filesystem>
 
@@ -57,6 +58,15 @@ int getOs(){
 char cwd;
 auto c = getcwd(&cwd, sizeof(cwd))*/
 
+bool isPngFile(std::string filepath){
+    std::ostringstream os;
+    auto size = filepath.length()-1;
+    os << filepath[size-3] << filepath[size-2] << filepath[size-1] << filepath[size-0];
+    if (os.str() == ".png")
+        return true;
+    return false;
+}
+
 // https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
 void listItemsInDirectoryAlt(std::string path){
     DIR *dir;
@@ -68,7 +78,20 @@ void listItemsInDirectoryAlt(std::string path){
         while ((ent = readdir (dir)) != NULL) {
             //printf ("%s\n", ent->d_name);
             //std::cout << ent->d_name << std::endl;
-            std::cout << counter << ":\t" << ent->d_name << "\t" << ent->d_type << std::endl;
+            auto filename = ent->d_name;
+            auto is_dir = ent->d_type == 16384;
+            if (is_dir){
+                std::cout << "\033[1;34m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
+            }else{
+                std::ostringstream os;
+                os << path << filename;
+                auto is_png = isPngFile(os.str());
+                if(is_png){
+                    std::cout << "\033[1;31m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
+                }else{
+                    std::cout << "\033[1;30m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
+                }
+            }
             //printf("%5d%10s%10s\n", counter , ent->d_name, ent->d_type);
             ++counter;
         }
@@ -358,10 +381,14 @@ private:
                 std::cout << "paramsplit " << e << std::endl;
             }
             #endif
-            if (paramSplit.size() != 2)
+            if (paramSplit.size() > 2)
                 continue;
             auto name = trimString(paramSplit.at(0));
-            auto value = trimString(paramSplit.at(1));
+            std::string value;
+            if (paramSplit.size() == 1)
+                value = "NONE";
+            else
+                value = trimString(paramSplit.at(1));
             std::cout << "found Parameter: " << name << "='" << value << "'"<< std::endl;
             m_parameters.insert({name, value});
         }
