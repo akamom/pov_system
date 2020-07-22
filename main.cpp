@@ -1,3 +1,12 @@
+/*
+--- Code Quality TODOs
+TODO: Code auf mehrere files verteilen (vorallem selection und parser Klasse in cpp und h Dateien aufteilen)
+TODO: Console Farben testen und vllt sogar rausnehmen
+
+--- Funktionale TODOs
+TODO: list files in directory
+*/
+
 #include <iostream>
 #include "pixel_reader.h"
 #include <Map>
