@@ -180,7 +180,7 @@ void loop() {
     yawModDeg = (int)yaw / stepDeg;
     
     for(int i = 0; i< NUMPIXELS ; i++){
-      if(quads[yawModQuad][yawModDeg][i] > 0){
+      if(quads[yawModQuad][i][yawModDeg] > 0){
           pixels.setPixelColor(i, 255,255,255);
         }
       }
