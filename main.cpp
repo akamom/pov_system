@@ -16,6 +16,10 @@ TODO: parameter like onlypng (with no value) or somth for dir coommand so that o
 #include <Map>
 // stat works on unix, linux and windows
 #include <sys/stat.h>
+<<<<<<< HEAD
+=======
+// #include <dirent.h>
+>>>>>>> 42586cb9005605e06c4b144833c4af91941f5c79
 #include "resources/dirent.h"
 // only available in c++ 17 and upgraded compiler
 // #include <filesystem>
