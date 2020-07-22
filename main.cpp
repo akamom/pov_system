@@ -5,6 +5,8 @@ TODO: Console Farben testen und vllt sogar rausnehmen
 
 --- Funktionale TODOs
 TODO: list files in directory
+TODO: Bluetooth?
+TODO: dirent.h auf Windows ausprobieren (list items in directory)
 */
 
 #include <iostream>
@@ -50,6 +52,10 @@ int getOs(){
     return 7;
 #endif
 }
+
+/*#include <unistd.h>
+char cwd;
+auto c = getcwd(&cwd, sizeof(cwd))*/
 
 // https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
 void listItemsInDirectoryAlt(std::string path){
