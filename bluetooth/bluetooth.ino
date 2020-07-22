@@ -1,27 +1,25 @@
-// https://howtomechatronics.com/tutorials/arduino/arduino-and-hc-05-bluetooth-module-tutorial/
+#include <SoftwareSerial.h> 
+SoftwareSerial MyBlue(2, 3); // RX | TX 
 
-#define ledPin 7
-int state = 0;
-
+int led=8;
+ 
 void setup() {
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW);
-  Serial.begin(38400); // Default communication rate of the Bluetooth module
-}
+  pinMode(8,OUTPUT);
+  Serial.begin(38400);
+  MyBlue.begin(9400);
+  }
 
 void loop() {
-  if(Serial.available() > 0){ // Checks whether data is comming from the serial port
-    state = Serial.read(); // Reads the data from the serial port
- }
-
- if (state == '0') {
-  digitalWrite(ledPin, LOW); // Turn LED OFF
-  Serial.println("LED: OFF"); // Send back, to the phone, the String "LED: ON"
-  state = 0;
- }
- else if (state == '1') {
-  digitalWrite(ledPin, HIGH);
-  Serial.println("LED: ON");;
-  state = 0;
- } 
+  if (MyBlue.available()>0) {
+    String data=MyBlue.readString(); //reading the data from the bluetooth module
+    if(data == "a")
+    {
+      digitalWrite(8,HIGH); // Pressing 'A' will power the led
+    }
+    else if (data != -1){
+      digitalWrite(8,LOW); // pressing 'B' will turn off the led
+    }
+    Serial.println(data); 
+    delay(1000);
+  } 
 }

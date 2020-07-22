@@ -2,24 +2,23 @@
 #include <SoftwareSerial.h> 
 SoftwareSerial MyBlue(2, 3); // RX | TX 
 
+//********LED STRIP**********************************************************************************
+#include <Adafruit_NeoPixel.h>
+#define PIN            6 
+#define NUMPIXELS      4
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN);
+
 //********Speed*******************************************************************************************
-unsigned long currentTime = 0;
-
-unsigned long recentTim = 0;
-
-unsigned long elapsed Time = 0;
-
-int delayTime;
-
+int finishTime = 0;
+int startTime = 0;
+int delayTime = 0;
 
 //********Gyro****************************************************************************************
 #include "I2Cdev.h"
 
 #include "MPU6050_6Axis_MotionApps20.h"
 
-#if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
-  #include "Wire.h"
-#endif
+#include "Wire.h"
 
 MPU6050 mpu;
 
@@ -40,60 +39,61 @@ float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gra
 float yaw;
 
 //********STEPS***************************************************************************************
-   int stepDeg = 15;
-   int quads [4][6][6] = {
-                            //Quad 1
-                            {
-                              {1,1,1,1,1,1},
-                              {1,1,1,1,1,1},
-                              {1,1,1,1,1,1},
-                              {0,0,0,0,0,0},
-                              {0,0,0,0,0,0},
-                              {0,0,0,0,0,0}
-                            },
-                            //Quad 2
-                            {
-                              {1,0,1,0,1,0},
-                              {1,0,1,0,1,0},
-                              {1,0,1,0,1,0},
-                              {0,1,0,1,0,1},
-                              {0,1,0,1,0,1},
-                              {0,1,0,1,0,1}
-                            },
-                            //Quad 3
-                            {
-                              {1,0,1,0,1,0},
-                              {1,0,1,0,1,0},
-                              {1,0,1,0,1,0},
-                              {0,1,0,1,0,1},
-                              {0,1,0,1,0,1},
-                              {0,1,0,1,0,1}
-                            },
-                            //Quad 4
-                            {
-                              {1,0,1,0,1,0},
-                              {1,0,1,0,1,0},
-                              {0,1,0,1,0,1},
-                              {0,1,0,1,0,1},
-                              {0,1,0,1,0,1}
-                            }
-                          };
+int stepDeg = 90 / NUMPIXELS ;
+int quads [4][6/*NUMPIXELS*/][6/*NUMPIXELS*/] = {
+                        //Quad 1
+                        {
+                          {1,0,0,0,0,0},
+                          {1,0,0,0,0,0},
+                          {1,0,0,0,0,0},
+                          {1,0,0,0,0,0},
+                          {1,0,0,0,0,0},
+                          {1,0,0,0,0,0},
+                        },
+                        //Quad 2
+                        {
+                          {0,1,0,0,0,0},
+                          {0,1,0,0,0,0},
+                          {0,1,0,0,0,0},
+                          {0,1,0,0,0,0},
+                          {0,1,0,0,0,0},
+                          {0,1,0,0,0,0},
+                          
+                        },
+                        //Quad 3
+                        {
+                          {0,0,1,0,0,0},
+                          {0,0,1,0,0,0},
+                          {0,0,1,0,0,0},
+                          {0,0,1,0,0,0},
+                          {0,0,1,0,0,0},
+                          {0,0,1,0,0,0},
+                        },
+                        //Quad 4
+                        {
+                          {0,0,0,1,0,0},
+                          {0,0,0,1,0,0},
+                          {0,0,0,1,0,0},
+                          {0,0,0,1,0,0},
+                          {0,0,0,1,0,0},
+                          {0,0,0,1,0,0},
+                        }
+                      };
     int yawModQuad; //index of current quadrant
     int yawModDeg; //index of line in quadrant
 
-
 void setup() {
   Serial.begin(115200);
+  
   //********Bluetooth**********************************************************************************
   MyBlue.begin(9600);
 
   //********LED****************************************************************************************
-  DDRD |= B10000000;      //7 as output  
-  DDRB |= B00111111;      //8 to 13 as output
-  
-  PORTD &= B00000011;     //2 to 7 LOW
-  PORTB &= B00000000;     //8 to 13 LOW
+  pixels.begin();
+  pixels.show();
+  pixels.setBrightness(50); //max = 255
 
+  
   //********GYRO***************************************************************************************
   // join I2C bus (I2Cdev library doesn't do this automatically)
   #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
@@ -117,13 +117,13 @@ void setup() {
   Serial.println(F("Initializing DMP..."));
   devStatus = mpu.dmpInitialize();
 
-  // supply your own gyro offsets here, scaled for min sensitivity
+  // set gyro offsets 
   mpu.setXGyroOffset(220);
   mpu.setYGyroOffset(76);
   mpu.setZGyroOffset(-85);
   mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
 
-  // make sure it worked (returns 0 if so)
+  // returns 0 if connection established
   if (devStatus == 0) {
       mpu.CalibrateAccel(6);
       mpu.CalibrateGyro(6);
@@ -143,57 +143,47 @@ void setup() {
   }
 }
 
-void loop() {
-  recentTime = micros();
+void loop() {  
   if (MyBlue.available()>0) {
     String data=MyBlue.readString(); //reading the data from the bluetooth module
     Serial.println("Received Data: " + data); 
   }  
     
-  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
-    // display Euler angles in degrees
+  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet    
+    // get current angle
     mpu.dmpGetQuaternion(&q, fifoBuffer);
     mpu.dmpGetGravity(&gravity, &q);
     mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
     yaw = ypr[0] * 180/M_PI;
-
-    //get elapsed time for one rotation
-    if(abs(yaw) >= 350 && abs(yaw) < 360){
-      currentTime = millis();
-      elapsedTime = currentTime - recentTime;
-      delayTime = elapsedTime / 360 * stepDeg;
-    }
     
     Serial.print("ypr\t");
     Serial.println(yaw);
-    yawModQuad = (int)yaw % 90;
-    yawModDeg = (int)yaw % 15;
+
+    //when new rotation starts
+    if(yaw >= 0 && yaw < 0,1){
+      startTime = millis();
+    }
+    //when full rotation is done
+    if(yaw >= -0,1 && yaw < 0){
+      finishTime = millis();
+      delayTime = (finishTime - startTime) / 360 * stepDeg;
+    }
+    yawModQuad = (int)yaw / 90;
+    if(yaw < 0){
+      if(yawModQuad == -1) yawModQuad = 2;
+      if(yawModQuad == 0) yawModQuad = 3;
+    }
+
+    Serial.print("modQuad\t");
+    Serial.println(yawModQuad);
     
-    for(int i = 0; i< 6; i++){
+    yawModDeg = (int)yaw / stepDeg;
+    
+    for(int i = 0; i< NUMPIXELS ; i++){
       if(quads[yawModQuad][yawModDeg][i] > 0){
-        switch(i){
-        case 0:
-          PORTB |= B00000001;
-          break;
-        case 1:
-          PORTB |= B00000010;
-          break;
-        case 2:
-          PORTB |= B00000100;
-          break;
-        case 3:
-          PORTB |= B00001000;
-          break;
-        case 4:
-          PORTB |= B00010000;
-          break;
-        case 5:
-          PORTB |= B00100000;
-          break;
+          pixels.setPixelColor(i, 255,255,255);
         }
       }
     }
-    delayMicroseconds(delaytime);
-    PORTB &= B11000000; //
-  }
+    pixels.show();
 }
