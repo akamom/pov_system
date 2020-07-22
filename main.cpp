@@ -8,10 +8,16 @@ TODO: list files in directory
 */
 
 #include <iostream>
+#include <sstream>
 #include "pixel_reader.h"
 #include <Map>
 // stat works on unix, linux and windows
 #include <sys/stat.h>
+#include <dirent.h>
+// only available in c++ 17 and upgraded compiler
+// #include <filesystem>
+
+// #include <IOKit>
 
 // if 'debug' more verbose console
 #define DEBUG
@@ -21,7 +27,7 @@ typedef std::map<std::string, std::pair<std::string, std::vector<std::string>>> 
 
 // current path
 // TODO: hier noch einen standart pfad angeben!
-std::string currentPath = "C:/";
+std::string currentPath = "/Users/i519401/Development/personal/C++/VPRProjekt/pov_system/resources/";
 // all commands will be <rootCommand> + <command>
 const std::string rootCommand = "pov";
 const std::string quitCommand = "q";
@@ -44,6 +50,40 @@ int getOs(){
     return 7;
 #endif
 }
+
+// https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+void listItemsInDirectoryAlt(std::string path){
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir (path.c_str())) != NULL) {
+        /* print all the files and directories within directory */
+        std::cout << "items in directory " << path << std::endl;
+        auto counter = 0;
+        while ((ent = readdir (dir)) != NULL) {
+            //printf ("%s\n", ent->d_name);
+            //std::cout << ent->d_name << std::endl;
+            std::cout << counter << ":\t" << ent->d_name << "\t" << ent->d_type << std::endl;
+            //printf("%5d%10s%10s\n", counter , ent->d_name, ent->d_type);
+            ++counter;
+        }
+        closedir (dir);
+    } else {
+        /* could not open directory */
+        // perror ("");
+        // return EXIT_FAILURE;
+        std::cout << "Error listing items!\n";
+    }
+}
+
+// namespace fs = std::filesystem;
+/*void listItemsInDirectory(std::string dir){
+    auto counter = 0;
+    std::filesystem::create_directory(dir);
+    std::cout << "items in directory " << dir << std::endl;
+    for (const auto &entry : std::filesystem::directory_iterator(dir)){
+        std::cout << counter << ": " << entry.path() << std::endl;
+    }
+}*/
 
 // https://stackoverflow.com/questions/18100097/portable-way-to-check-if-directory-exists-windows-linux-c
 inline bool directoryExists(const std::string &dir){
@@ -159,6 +199,10 @@ public:
     ~ImageSelection_c(){}
 
     void addImage(const std::string fileName){
+        if (m_pixelSelection.size() >= MAX_SELECTED){
+            std::cout << "maximum number of selected items reached. Cannot add more than " << MAX_SELECTED << std::endl;
+            return;
+        }
         // build full pathname
         auto completeFileName = trimString(currentPath + fileName);
         auto exists = fileExists(completeFileName);
@@ -182,11 +226,12 @@ public:
             return;
         }
 
-        auto tranformed = pixelsToBools(pixels);
+        // auto transformed = pixelsToBoolString(pixels);
+        auto transformed = pixelsToPixelsString(pixels);
 
         // add to selection
         //m_pixelSelection.insert({completeFileName, pixels});
-        m_pixelSelection.insert({completeFileName, tranformed});
+        m_pixelSelection.insert({completeFileName, transformed});
     }
     void addImage(const std::string fileName, const int atIndex){}
     void removeImage(const std::string fileName){}
@@ -213,7 +258,7 @@ public:
         //    ++index;
         //}
         for(std::map<std::string, std::string>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
-            std::cout << index << ": " << it->first << " Farben: " << it->second << std::endl;
+            std::cout << index << ": " << it->first << "\nFarben: " << it->second << std::endl;
             ++index;
         }
         std::cout << "----------------------------------\n";
@@ -224,7 +269,9 @@ private:
     std::map<std::string, std::string>  m_pixelSelection;
     // std::map<std::string, std::vector<color>>   m_pixelSelection;
 
-    std::string pixelsToBools(std::vector<color> pix){
+    const size_t MAX_SELECTED = 1;
+
+    std::string pixelsToBoolString(std::vector<color> pix){
         //auto transformed = std::vector<bool>();
         std::string asstring = "";
         for (auto &a:pix){
@@ -236,6 +283,18 @@ private:
             asstring.push_back(';');
         }
         //return transformed;
+        return asstring;
+    }
+
+    std::string pixelsToPixelsString(std::vector<color> pix){
+        std::string asstring = "";
+        for (auto &a:pix){
+            std::ostringstream os;
+            os << a.R << "," << a.G << "," << a.B << ";";
+            asstring.append(os.str());
+        }
+        // append ending char
+        asstring.push_back('.');
         return asstring;
     }
 };
@@ -340,7 +399,7 @@ void gotoDirectory(char* dir){
 // key: string as command, value: string as description
 cmdMap_t commandMap = {
     {"help", {"lists all commands", {}}},
-    {"goto", {"sets the current working path", {"optional: <path=[path]>: path as value"}}},
+    {"dir", {"sets the current working path or lists items in current dir", {"optional: <set=[path]>: path as value, sets working dir"}}},
     {"add", {"adds image to selection", {"mandatory: <file=[filename]>: file in current path", "optional: <index=[index]>: at which index to insert"}}},
     {"remove", {"removes image from selection either by index or by name", {}}},
     {"status", {"lists all selected images and index", {}}}
@@ -360,8 +419,6 @@ void printHelp(){
 
 auto selection = ImageSelection_c();
 
-// siehe unten. So ähnlich aber dann halt in der Map
-void* exeHelp = &printHelp;
 bool evaluateCommand(std::string cmd){
     auto paramParser = ParameterParser_c(cmd);
     auto base = paramParser.baseCommand;
@@ -374,22 +431,22 @@ bool evaluateCommand(std::string cmd){
         //(void)*exeHelp();
         printHelp();
         return true;
-    } else if (base == (rootCommand+" goto")){
-        // test!
-        //gotoDirectory("C:/Users/olitw/Downloads");
+    } else if (base == (rootCommand+" dir")){
         std::string path = "";
-        bool gotValue = paramParser.getParameter("path", path);
-        std::cout << "goto directory: "<< path << std::endl;
+        bool gotValue = paramParser.getParameter("set", path);
         // if error, parameter was not found, meaning invalid parameter command
-        if (!gotValue)
-            return false;
-        // else path command is there and we use the value
-        // TODO: check ob pfad existiert
-        correctPath(path);
-        auto exists = directoryExists(path);
-        if (exists)
-            currentPath = path;
-        //listItemsInDirectory(strdup(path.c_str()));
+        if (gotValue){
+            // set path param passed
+            correctPath(path);
+            auto exists = directoryExists(path);
+            if (exists){
+                currentPath = path;
+                listItemsInDirectoryAlt(path);
+            }
+        }else{
+            // no params passed -> list all items in current dir
+            listItemsInDirectoryAlt(currentPath);
+        }
         return true;
     } else if (base == (rootCommand+" add")){
         std::string filename = "";
