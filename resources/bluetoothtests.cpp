@@ -1,5 +1,4 @@
 #include <iostream>
-
 #include <winsock2.h>
 #include <ws2bth.h>
 SOCKADDR_BTH sockAddr;
@@ -28,8 +27,6 @@ int main()
 
 #include <windows.h>
 
-/* ... */
-
 int main() {
 	// Open serial port
 	HANDLE serialHandle;
@@ -57,7 +54,7 @@ int main() {
 
 	SetCommTimeouts(serialHandle, &timeout);
 
-	std::string data = "some shit";
+	std::string data = "test text";
 	DWORD bytesrecieved;
 	WriteFile(serialHandle, &data, data.length(), &bytesrecieved, NULL);
 	std::cout << bytesrecieved << std::endl;
