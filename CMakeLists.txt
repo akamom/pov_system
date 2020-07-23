@@ -6,3 +6,11 @@ add_subdirectory(lib/pixel_reader)
 add_executable(pov_system main.cpp)
 
 target_link_libraries(pov_system PRIVATE pixel_reader)
+
+add_library(
+    filesys
+    filesys.cpp
+    filesys.h
+)
+
+target_link_libraries(pov_system PRIVATE filesys)

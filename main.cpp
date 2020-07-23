@@ -15,18 +15,7 @@ x TODO: parameter sollten entweder so "set=" oder auch so "s=" ansprechbar sein
 #include <sstream>
 #include "pixel_reader.h"
 #include <Map>
-// stat works on unix, linux and windows
-#include <sys/stat.h>
-// only available in c++ 17 and upgraded compiler
-// #include <filesystem>
-
-// #include <IOKit>
-
-#ifdef _WIN32 || _WIN64
-    #include "resources/dirent.h"
-#elif __APPLE__ || __MACH__ || __linux__
-    #include <dirent.h>
-#endif
+#include "filesys.h"
 
 // if 'DEBUG' more verbose console
 #define DEBUG
@@ -67,76 +56,6 @@ int getOs(){
 /*#include <unistd.h>
 char cwd;
 auto c = getcwd(&cwd, sizeof(cwd))*/
-
-bool isPngFile(std::string filepath){
-    std::ostringstream os;
-    auto size = filepath.length()-1;
-    os << filepath[size-3] << filepath[size-2] << filepath[size-1] << filepath[size-0];
-    if (os.str() == ".png")
-        return true;
-    return false;
-}
-
-// https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
-void listItemsInDirectoryAlt(std::string path){
-    DIR *dir;
-    struct dirent *ent;
-    if ((dir = opendir (path.c_str())) != NULL) {
-        /* print all the files and directories within directory */
-        std::cout << "items in directory " << path << std::endl;
-        auto counter = 0;
-        while ((ent = readdir (dir)) != NULL) {
-            auto filename = ent->d_name;
-            switch (ent->d_type) {
-                case DT_DIR:
-                    // Directory
-                    std::cout << "\033[1;34m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
-                    break;
-                default:
-                    // all other than directory case DT_REG for regular file
-                    std::ostringstream os;
-                    os << path << filename;
-                    auto is_png = isPngFile(os.str());
-                    if(is_png){
-                        std::cout << "\033[1;31m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
-                    }else{
-                        std::cout << "\033[1;30m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
-                    }
-                    break;
-            }
-            ++counter;
-        }
-        closedir (dir);
-    } else {
-        /* could not open directory */
-        // perror ("");
-        // return EXIT_FAILURE;
-        std::cout << "Error listing items!\n";
-    }
-}
-
-// https://stackoverflow.com/questions/18100097/portable-way-to-check-if-directory-exists-windows-linux-c
-inline bool directoryExists(const std::string &dir){
-    struct stat info;
-    char *pathname = strdup(dir.c_str());
-
-    if( stat( pathname, &info ) != 0 ){
-        std::cout << pathname << " cannot be accessed!\n";
-        return false;
-    }
-    else if( info.st_mode & S_IFDIR )  // S_ISDIR() doesn't exist on my windows 
-        return true;
-    else{
-        std::cout << pathname << " is not directory!\n";
-        return false;
-    }
-}
-
-// https://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exist-using-standard-c-c11-c
-inline bool fileExists(const std::string &name) {
-  struct stat buffer;   
-  return (stat (name.c_str(), &buffer) == 0); 
-}
 
 // https://stackoverflow.com/questions/25829143/trim-whitespace-from-a-string/25829178
 std::string trimString(const std::string &str)
@@ -235,7 +154,7 @@ public:
         }
         // build full pathname
         auto completeFileName = trimString(currentPath + fileName);
-        auto exists = fileExists(completeFileName);
+        auto exists = filesys::fileExists(completeFileName);
         // file existent?
         if (!exists){
             std::cout << completeFileName << " does not exist!\n";
@@ -444,7 +363,7 @@ void gotoDirectory(char* dir){
 cmdMap_t commandMap = {
     {"help", {"lists all commands", {}}},
     {"dir", {"sets the current working path or lists items in current dir", {"optional: <set/s=[path]>: path as value, sets working dir"}}},
-    {"add", {"adds image to selection", {"mandatory: <file/f=[filename]>: file in current path", "optional: <index/i=[index]>: at which index to insert"}}},
+    {"add", {"adds image to selection", {"mandatory: <file/f=[filename]>: file in current path"}}},
     {"remove", {"removes image from selection either by index or by name", {"mandatory: <index/i=[index]>: which index to delete from selection"}}},
     {"status", {"lists all selected images and index", {}}},
     {"start", {"uploads selection to arduino", {}}}
@@ -452,7 +371,6 @@ cmdMap_t commandMap = {
 
 void printHelp(){
     std::cout << "-----------POV Help Page------------\n" << "Current Path: " << currentPath << std::endl;
-    std::cout << "Selected Items: \n";
     for (cmdMap_t::iterator it = commandMap.begin(); it != commandMap.end(); ++it){
         std::cout << "\033[1;31m"<< it->first <<": \033[0m" << it->second.first << std::endl;
         for (int i = 0; i<it->second.second.size(); i++){
@@ -483,14 +401,14 @@ bool evaluateCommand(std::string cmd){
         if (gotValue){
             // set path param passed
             correctPath(path);
-            auto exists = directoryExists(path);
+            auto exists = filesys::directoryExists(path);
             if (exists){
                 currentPath = path;
-                listItemsInDirectoryAlt(path);
+                filesys::listItemsInDirectoryAlt(path);
             }
         }else{
             // no params passed -> list all items in current dir
-            listItemsInDirectoryAlt(currentPath);
+            filesys::listItemsInDirectoryAlt(currentPath);
         }
         return true;
     } else if (base == (rootCommand+" add")){
@@ -541,6 +459,7 @@ int main(int, char**) {
 
     std::cout << "\033[1m >>>>> POV Enviroment Start\n";
     std::cout << "enter '"<< quitCommand <<"' to quit. enter 'pov help' to list available commands\033[0m\n";
+    std::cout << "\033[33m INFO: please input path and filenames enclosed by quotation marks (\")\033[0m\n";
     // last user input
     std::string lastInput = "";
     // programm loop
