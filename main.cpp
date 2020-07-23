@@ -17,24 +17,26 @@ x TODO: parameter sollten entweder so "set=" oder auch so "s=" ansprechbar sein
 #include <Map>
 #include "filesys.h"
 
-// if 'DEBUG' more verbose console
-#define DEBUG
+// set to 'DEBUG' for more verbose output
+#define PROD
 
+// typedefinition for map that holds commands, description and parameters
 // key: commandname, value: description, parameterlist
 typedef std::map<std::string, std::pair<std::string, std::vector<std::string>>> cmdMap_t;
 
-// current path
-// TODO: hier noch einen standart pfad angeben!
+// cwd in pov enviroment
 #ifdef DEBUG
 std::string currentPath = "/Users/i519401/Development/personal/C++/VPRProjekt/pov_system/resources/";
 #else
 std::string currentPath = "NO PATH";
 #endif
-// all commands will be <rootCommand> + <command>
+
+// rootcommand for all other commands, like a prefix
 const std::string rootCommand = "pov";
+// command for quitting the main loop
 const std::string quitCommand = "q";
 
-// system specific console commands
+// get operation system
 int getOs(){
 #ifdef _WIN32
     return 1;
@@ -53,12 +55,13 @@ int getOs(){
 #endif
 }
 
-/*#include <unistd.h>
-char cwd;
-auto c = getcwd(&cwd, sizeof(cwd))*/
-
-// https://stackoverflow.com/questions/25829143/trim-whitespace-from-a-string/25829178
-std::string trimString(const std::string &str)
+/**
+ * @brief cuts whitespaces from left and right
+ * Source: https://stackoverflow.com/questions/25829143/trim-whitespace-from-a-string/25829178
+ * @param str string to be trimmed
+ * @return std::string trimmed string
+ */
+std::string trimString(const std::string str)
 {
     size_t first = str.find_first_not_of(' ');
     if (std::string::npos == first)
@@ -69,15 +72,20 @@ std::string trimString(const std::string &str)
     return str.substr(first, (last - first + 1));
 }
 
+/**
+ * @brief replaces backslashes with slashes and sets slash to end if not there
+ * 
+ * @param path path to be corrected
+ */
 void correctPath(std::string &path) {
-    // replaces all occurences of \ with /, and removes multiple backslashes
+    // used characters
     char lastChar = 'a';
     const char ch1 = '\\';
     const char ch2 = '/';
+    // loop through all chars in path
     for (int i = 0; i < path.length(); ++i) {
         if (lastChar == ch1 && path[i] == ch1){
             // remove double backslashes
-            //path[i] = (char)0;
             path.erase(i, 1);
             continue;
         }
@@ -87,14 +95,24 @@ void correctPath(std::string &path) {
             path[i] = ch2;
         }
     }
+    // append slash if not there
     if (path[path.length()-1] != '/')
         path.append("/");
 }
 
+/**
+ * @brief advanced spliiting method
+ * 
+ * @param s to be split string
+ * @param delimiter split by which character
+ * @param ignore_inside_string if false, will not split parts in string eclosed by "", only works if delimiter is one space
+ * @return std::vector<std::string> the split parts of the string
+ */
 std::vector<std::string> split(std::string s, std::string delimiter, bool ignore_inside_string = false){
+    // temporary replacement char, should be somethin unique
 	const auto string_space_replacement = '$';
     // automatically check if there is a need to check for strings
-    if (s.find('"') == std::string::npos)
+    if (s.find('"') == std::string::npos || delimiter != " ")
         ignore_inside_string = true;
 
 	if (!ignore_inside_string)
@@ -118,7 +136,9 @@ std::vector<std::string> split(std::string s, std::string delimiter, bool ignore
 	s.append(delimiter);
 	std::vector<std::string> list;
 	size_t pos;
+    // loop through all found delimiter chars
 	while ((pos = s.find(delimiter)) != std::string::npos) {
+        // create string from 0 to current delimiter pos
 		auto token = s.substr(0, pos);
 		if (!token.empty())
 		{
@@ -131,22 +151,32 @@ std::vector<std::string> split(std::string s, std::string delimiter, bool ignore
 					token[space_replace_pos] = ' ';
 				}
 			}
+            // append to return list
 			list.push_back(token);
 		}
+        // remove from char 0 to last position
 		s.erase(0, pos + delimiter.length());
 	}
 	return list;
 }
 
+/**
+ * @brief selection of images and handler for that
+ * 
+ */
 class ImageSelection_c{
 public:
     ImageSelection_c(){
-        // m_pixelSelection = std::map<std::string, std::vector<color>>();
+        // init
         m_pixelSelection = std::map<std::string, std::string>();
-        m_pathSelection = std::map<std::string, std::string>();
     }
     ~ImageSelection_c(){}
 
+    /**
+     * @brief adds image by filename
+     * 
+     * @param fileName name of file
+     */
     void addImage(const std::string fileName){
         if (m_pixelSelection.size() >= MAX_SELECTED){
             std::cout << "maximum number of selected items reached. Cannot add more than " << MAX_SELECTED << std::endl;
@@ -175,16 +205,19 @@ public:
             return;
         }
 
-        // auto transformed = pixelsToBoolString(pixels);
+        // get correct sending format
         auto transformed = pixelsToPixelsString(pixels);
 
         // add to selection
-        //m_pixelSelection.insert({completeFileName, pixels});
         m_pixelSelection.insert({completeFileName, transformed});
         std::cout << "added image " << fileName << " to selection\n";
     }
-    void addImage(const std::string fileName, const int atIndex){}
-    void removeImage(const std::string fileName){}
+    
+    /**
+     * @brief removes image from selection by index
+     * 
+     * @param atIndex index of item (visible when typed pov status)
+     */
     void removeImage(const int atIndex){
         if (atIndex >= m_pixelSelection.size()){
             std::cout << "index out of bounds\n";
@@ -201,13 +234,13 @@ public:
         }
     }
 
+    /**
+     * @brief pretty prints all items in selection
+     * 
+     */
     void printSelection(){
         int index = 0;
         std::cout << "---- current image selection: ----\n";
-        //for(std::map<std::string, std::vector<color>>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
-        //    std::cout << index << ": " << it->first << std::endl;
-        //    ++index;
-        //}
         for(std::map<std::string, std::string>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
             std::cout << index << ": " << it->first << "\nFarben: " << it->second << std::endl;
             ++index;
@@ -215,21 +248,23 @@ public:
         std::cout << "----------------------------------\n";
     }
 private:
-    std::map<std::string, std::string>          m_pathSelection;
-    // selection of images. key: path+imagename, value: conversed pixels
-    std::map<std::string, std::string>  m_pixelSelection;
-    // std::map<std::string, std::vector<color>>   m_pixelSelection;
+    // all selected items are stored here
+    std::map<std::string, std::string> m_pixelSelection;
 
+    // maximum selected items possible
     const size_t MAX_SELECTED = 1;
 
+    /**
+     * @brief converts pixel RGB list to string with bools, seperated by char
+     * 3 values RGB > 1 value bool
+     * @param pix list of pixels from image
+     * @return std::string 
+     */
     std::string pixelsToBoolString(std::vector<color> pix){
-        //auto transformed = std::vector<bool>();
         std::string asstring = "";
         for (auto &a:pix){
             size_t rgbscalar = a.R + a.B + a.G; // ignore alpha
             bool t = rgbscalar != 0;
-            //transformed.push_back(t); // only if black then 0, all other colors will be 1
-            //asstring.push_back(t ? '\u25fb' : '\u25fc');
             asstring.push_back(t ? '1' : '0');
             asstring.push_back(';');
         }
@@ -237,9 +272,16 @@ private:
         return asstring;
     }
 
+    /**
+     * @brief turns pixel RGB list into string with RGB values
+     * 
+     * @param pix pixel lsit
+     * @return std::string 
+     */
     std::string pixelsToPixelsString(std::vector<color> pix){
         std::string asstring = "";
         for (auto &a:pix){
+            // build string containing RGB
             std::ostringstream os;
             os << a.R << "," << a.G << "," << a.B << ";";
             asstring.append(os.str());
@@ -250,9 +292,15 @@ private:
     }
 };
 
+/**
+ * @brief string parameter parser
+ * 
+ */
 class ParameterParser_c{
 public:
+    // the base (consisting of 2 words: <root><action cmd>)
     std::string baseCommand;
+    // the original input
     std::string originalCommand;
 
     ParameterParser_c(std::string _cmd) : originalCommand(_cmd), baseCommand(""){
@@ -262,45 +310,62 @@ public:
 
     ~ParameterParser_c(){}
 
+    /**
+     * @brief checks whether string contains a parameter and returns it's value
+     * 
+     * @param param_name the parameters name
+     * @param param_value the to be returned value
+     * @param alt_param_name an alternative parameter name (optional)
+     * @return true the parameter exists
+     * @return false does not exist
+     */
     bool getParameter(std::string param_name, std::string &param_value, std::string alt_param_name = "") const{
         if (m_parameters.empty())
             return false;
-        std::map<std::string, std::string>::const_iterator it = m_parameters.find(param_name); //m_parameters.at(param_name);
+        std::map<std::string, std::string>::const_iterator it = m_parameters.find(param_name);
         // meaning key non existent
         if (it == m_parameters.end()){
             it = m_parameters.find(alt_param_name);
             auto alt_param_empty = alt_param_name.empty();
             if (!alt_param_empty && it != m_parameters.end()){
+                // alt param exists, return value
                 param_value = it->second;
                 return true;
             }
+            // param doesnt exist
             std::cout << "parameter " << param_name << (alt_param_empty ? "" : " or alternatively ") << (alt_param_empty ? "" : alt_param_name) <<  " does not exist!\n";
             return false;
         }
+        // param exists, return value
         param_value = it->second;
         return true;
     }
 private:
+    // the list of parameters
     std::map<std::string, std::string> m_parameters;
-
+    
+    // parameter <splitSymbol> value
     const std::string splitSymbol = "=";
+    /**
+     * @brief parses string and retrieves all parameters and base command
+     * 
+     */
     void getParametersFromCommand(){
         auto rawSplit = split(this->originalCommand, " ");
-        // not even baseCommand input
         #ifdef DEBUG
         for (auto e : rawSplit){
             std::cout << e << std::endl;
         }
         #endif
+        // not even base exists, cannot parse
         if (rawSplit.size() < 2)
             return;
-        // first 2 are mandatory commands
-        // baseCommand is mandatory 2 commands
         this->baseCommand = (trimString(rawSplit[0]) + " " + trimString(rawSplit[1]));
         // if only basecommand exists
         if (rawSplit.size() <= 2)
             return;
 
+        // retrieve all params
         for(std::vector<std::string>::iterator it = rawSplit.begin()+2; it != rawSplit.end(); ++it){
             auto paramSplit = split(*it, this->splitSymbol, true);
             #ifdef DEBUG
@@ -325,6 +390,7 @@ private:
     }
 };
 
+#pragma region not_used
 // system spezifische commands
 char* listItemsCommand = "";
 char* gotoDirectoryCommand = "";
@@ -358,6 +424,8 @@ void gotoDirectory(char* dir){
     std::system(strcat(gotoDirectoryCommand, dir));
 }
 
+#pragma endregion
+
 // commands as map (only used in help screen!)
 // key: string as command, value: string as description
 cmdMap_t commandMap = {
@@ -369,6 +437,10 @@ cmdMap_t commandMap = {
     {"start", {"uploads selection to arduino", {}}}
 };
 
+/**
+ * @brief prints all commands
+ * 
+ */
 void printHelp(){
     std::cout << "-----------POV Help Page------------\n" << "Current Path: " << currentPath << std::endl;
     for (cmdMap_t::iterator it = commandMap.begin(); it != commandMap.end(); ++it){
@@ -380,18 +452,26 @@ void printHelp(){
     std::cout << "--------------------------------------\n";
 }
 
+// current selection, later multiple selection can be implemented
 auto selection = ImageSelection_c();
 
+/**
+ * @brief parses command and acts
+ * 
+ * @param cmd input by user
+ * @return true command exists
+ * @return false doesnt exist
+ */
 bool evaluateCommand(std::string cmd){
+    // parse cmd
     auto paramParser = ParameterParser_c(cmd);
+    // load base command
     auto base = paramParser.baseCommand;
     #ifdef DEBUG
         std::cout << base << std::endl;
     #endif
-    // TODO: optionen des Commands wie z.B. pov goto <Pfad> müssen extrahiert werden
-    // TODO: in die commandMap iwie void* einfügen und falls cmd == key, dann void* methode aufrufen?
     if (base == (rootCommand+" help")){
-        //(void)*exeHelp();
+        // print commands
         printHelp();
         return true;
     } else if (base == (rootCommand+" dir")){
@@ -412,13 +492,13 @@ bool evaluateCommand(std::string cmd){
         }
         return true;
     } else if (base == (rootCommand+" add")){
+        // adds file to selection
         std::string filename = "";
         bool gotValue = paramParser.getParameter("file", filename, "f");
         if (!gotValue)
             return false;
         auto splitfilename = split(filename, ".");
         auto fileextension = splitfilename[splitfilename.size()-1];
-        //auto fileextension = *(splitfilename.end()-1);
         #ifdef DEBUG
         for (auto a : splitfilename){
             std::cout << a << std::endl;
@@ -434,6 +514,7 @@ bool evaluateCommand(std::string cmd){
         selection.addImage(filename);
         return true;
     } else if (base == (rootCommand+" remove")){
+        // remove file from selection
         std::string index;
         bool gotValue = paramParser.getParameter("index", index, "i");
         if (!gotValue)
@@ -442,9 +523,11 @@ bool evaluateCommand(std::string cmd){
         selection.removeImage(index_from_string);
         return true;
     } else if (base == (rootCommand+" status")){
+        // print status
         selection.printSelection();
         return true;
     } else if (base == (rootCommand+" start")){
+        // not implemented
         std::cout << "starting upload to arduino\n";
         return true;
     }
@@ -453,18 +536,21 @@ bool evaluateCommand(std::string cmd){
 }
 
 int main(int, char**) {
+    // check os
     if (os > 4)
         return 1;
     setCommandIdentifiers();
 
+    // init enviroment screen
     std::cout << "\033[1m >>>>> POV Enviroment Start\n";
     std::cout << "enter '"<< quitCommand <<"' to quit. enter 'pov help' to list available commands\033[0m\n";
     std::cout << "\033[33m INFO: please input path and filenames enclosed by quotation marks (\")\033[0m\n";
     // last user input
     std::string lastInput = "";
-    // programm loop
+    // main loop
     do{
         std::cout << "\033[1;32m<" << currentPath << ">: \033[0m";
+        // get user input
         std::getline(std::cin, lastInput);
         lastInput = trimString(lastInput);
         if (lastInput == quitCommand)

@@ -5,6 +5,7 @@
 typedef std::vector<unsigned char> imgVector;
 #define forloop(len) for(int i = 0; i<len; i++)
 
+// basic color struct
 struct color{
     color(int r, int g, int b, int a) : R{r}, G{g}, B{b}, A{a} {}
     int R, G, B, A;
@@ -14,6 +15,12 @@ struct color{
 };
 
 namespace pixel {
+    /**
+     * @brief sample function to load png
+     * 
+     * @param filename 
+     * @return imgVector 
+     */
     imgVector decodeTwoSteps(const char* filename) {
         std::vector<unsigned char> png;
         std::vector<unsigned char> image; //the raw pixels
@@ -31,10 +38,18 @@ namespace pixel {
     //the pixels are now in the vector "image", 4 bytes per pixel, ordered RGBARGBA..., use it as texture, draw it, ...
     }
 
+    // width and height restriction
     const int heightRestriction = 10;
     const int widthRestriction = 10;
-    //Example 3
-    //Load PNG file from disk using a State, normally needed for more advanced usage.
+    
+    /**
+     * @brief Load PNG file from disk using a State, normally needed for more advanced usage. Sample function
+     * 
+     * @param filename 
+     * @param pixels 
+     * @return true 
+     * @return false 
+     */
     bool decodeWithState(const char* filename, std::vector<color> &pixels) {
         std::vector<unsigned char> png;
         std::vector<unsigned char> image; //the raw pixels
