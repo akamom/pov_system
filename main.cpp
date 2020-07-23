@@ -11,11 +11,10 @@ TODO: parameter like onlypng (with no value) or somth for dir coommand so that o
 x TODO: parameter sollten entweder so "set=" oder auch so "s=" ansprechbar sein
 */
 
-#include <iostream>
-#include <sstream>
-#include "pixel_reader.h"
-#include <Map>
 #include "filesys.h"
+#include "stringop.h"
+#include "commandparser.h"
+#include "imageselection.h"
 
 // if 'DEBUG' more verbose console
 #define DEBUG
@@ -57,88 +56,7 @@ int getOs(){
 char cwd;
 auto c = getcwd(&cwd, sizeof(cwd))*/
 
-// https://stackoverflow.com/questions/25829143/trim-whitespace-from-a-string/25829178
-std::string trimString(const std::string &str)
-{
-    size_t first = str.find_first_not_of(' ');
-    if (std::string::npos == first)
-    {
-        return str;
-    }
-    size_t last = str.find_last_not_of(' ');
-    return str.substr(first, (last - first + 1));
-}
-
-void correctPath(std::string &path) {
-    // replaces all occurences of \ with /, and removes multiple backslashes
-    char lastChar = 'a';
-    const char ch1 = '\\';
-    const char ch2 = '/';
-    for (int i = 0; i < path.length(); ++i) {
-        if (lastChar == ch1 && path[i] == ch1){
-            // remove double backslashes
-            //path[i] = (char)0;
-            path.erase(i, 1);
-            continue;
-        }
-        lastChar = path[i];
-        if (path[i] == ch1){
-            // replace backslash with slash
-            path[i] = ch2;
-        }
-    }
-    if (path[path.length()-1] != '/')
-        path.append("/");
-}
-
-std::vector<std::string> split(std::string s, std::string delimiter, bool ignore_inside_string = false){
-	const auto string_space_replacement = '$';
-    // automatically check if there is a need to check for strings
-    if (s.find('"') == std::string::npos)
-        ignore_inside_string = true;
-
-	if (!ignore_inside_string)
-	{
-		// replace space inside string with replacement char
-		auto is_inside_string = false;
-		for(auto i = 0; i<s.length(); i++)
-		{
-			const auto c = s[i];
-			if (c == '"')
-			{
-				is_inside_string = !is_inside_string;
-				s.erase(i, 1);
-			}
-			if (c == ' ' && is_inside_string)
-				s[i] = string_space_replacement;
-		}
-	}
-
-	// append delimiter to iterate through all split string not all-1
-	s.append(delimiter);
-	std::vector<std::string> list;
-	size_t pos;
-	while ((pos = s.find(delimiter)) != std::string::npos) {
-		auto token = s.substr(0, pos);
-		if (!token.empty())
-		{
-			if (!ignore_inside_string)
-			{
-				// replace replacement char with space again
-				size_t space_replace_pos;
-				while ((space_replace_pos = token.find(string_space_replacement)) != std::string::npos)
-				{
-					token[space_replace_pos] = ' ';
-				}
-			}
-			list.push_back(token);
-		}
-		s.erase(0, pos + delimiter.length());
-	}
-	return list;
-}
-
-class ImageSelection_c{
+/* class ImageSelection_c{
 public:
     ImageSelection_c(){
         // m_pixelSelection = std::map<std::string, std::vector<color>>();
@@ -147,31 +65,27 @@ public:
     }
     ~ImageSelection_c(){}
 
-    void addImage(const std::string fileName){
+    void addImage(const std::string abs_file_path){
         if (m_pixelSelection.size() >= MAX_SELECTED){
             std::cout << "maximum number of selected items reached. Cannot add more than " << MAX_SELECTED << std::endl;
             return;
         }
-        // build full pathname
-        auto completeFileName = trimString(currentPath + fileName);
-        auto exists = filesys::fileExists(completeFileName);
-        // file existent?
-        if (!exists){
-            std::cout << completeFileName << " does not exist!\n";
-            return;
-        }
+        #ifdef DEBUG
+        std::cout << abs_file_path << std::endl;
+        #endif
+        
         // file already in selection
-        if (m_pixelSelection.find(completeFileName) != m_pixelSelection.end()){
-            std::cout << completeFileName << " is already selected\n";
+        if (m_pixelSelection.find(abs_file_path) != m_pixelSelection.end()){
+            std::cout << abs_file_path << " is already selected\n";
             return;
         }
 
         // extract pixel data
         auto pixels = std::vector<color>();
-        bool succeeded = pixel::decodeWithState(completeFileName.c_str(), pixels);
+        bool succeeded = pixel::decodeWithState(abs_file_path.c_str(), pixels);
         // check ob pixel extrahiert werden konnten
         if (!succeeded){
-            std::cout << "cannot add " << completeFileName << " to selection\n";
+            std::cout << "cannot add " << abs_file_path << " to selection\n";
             return;
         }
 
@@ -179,9 +93,9 @@ public:
         auto transformed = pixelsToPixelsString(pixels);
 
         // add to selection
-        //m_pixelSelection.insert({completeFileName, pixels});
-        m_pixelSelection.insert({completeFileName, transformed});
-        std::cout << "added image " << fileName << " to selection\n";
+        //m_pixelSelection.insert({abs_file_path, pixels});
+        m_pixelSelection.insert({abs_file_path, transformed});
+        std::cout << "added image " << abs_file_path << " to selection\n";
     }
     void addImage(const std::string fileName, const int atIndex){}
     void removeImage(const std::string fileName){}
@@ -193,8 +107,8 @@ public:
         auto index = 0;
         for(std::map<std::string, std::string>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
             if (atIndex == index){
-                m_pixelSelection.erase(it);
                 std::cout << "removed image " << it->first << " from selection\n";
+                m_pixelSelection.erase(it);
                 return;
             }
             ++index;
@@ -248,8 +162,9 @@ private:
         asstring.push_back('.');
         return asstring;
     }
-};
+}; */
 
+/*
 class ParameterParser_c{
 public:
     std::string baseCommand;
@@ -285,7 +200,7 @@ private:
 
     const std::string splitSymbol = "=";
     void getParametersFromCommand(){
-        auto rawSplit = split(this->originalCommand, " ");
+        auto rawSplit = stringop::split(this->originalCommand, " ");
         // not even baseCommand input
         #ifdef DEBUG
         for (auto e : rawSplit){
@@ -296,13 +211,13 @@ private:
             return;
         // first 2 are mandatory commands
         // baseCommand is mandatory 2 commands
-        this->baseCommand = (trimString(rawSplit[0]) + " " + trimString(rawSplit[1]));
+        this->baseCommand = (stringop::trimString(rawSplit[0]) + " " + stringop::trimString(rawSplit[1]));
         // if only basecommand exists
         if (rawSplit.size() <= 2)
             return;
 
         for(std::vector<std::string>::iterator it = rawSplit.begin()+2; it != rawSplit.end(); ++it){
-            auto paramSplit = split(*it, this->splitSymbol, true);
+            auto paramSplit = stringop::split(*it, this->splitSymbol, true);
             #ifdef DEBUG
             std::cout << "param: " << *it << std::endl;
             for (auto e : paramSplit){
@@ -311,12 +226,12 @@ private:
             #endif
             if (paramSplit.size() > 2)
                 continue;
-            auto name = trimString(paramSplit.at(0));
+            auto name = stringop::trimString(paramSplit.at(0));
             std::string value;
             if (paramSplit.size() == 1)
                 value = "NONE";
             else
-                value = trimString(paramSplit.at(1));
+                value = stringop::trimString(paramSplit.at(1));
             #ifdef DEBUG
             std::cout << "found Parameter: " << name << "='" << value << "'"<< std::endl;
             #endif
@@ -324,6 +239,7 @@ private:
         }
     }
 };
+*/
 
 // system spezifische commands
 char* listItemsCommand = "";
@@ -400,7 +316,7 @@ bool evaluateCommand(std::string cmd){
         // if error, parameter was not found, meaning invalid parameter command
         if (gotValue){
             // set path param passed
-            correctPath(path);
+            stringop::correctPath(path);
             auto exists = filesys::directoryExists(path);
             if (exists){
                 currentPath = path;
@@ -416,7 +332,7 @@ bool evaluateCommand(std::string cmd){
         bool gotValue = paramParser.getParameter("file", filename, "f");
         if (!gotValue)
             return false;
-        auto splitfilename = split(filename, ".");
+        auto splitfilename = stringop::split(filename, ".");
         auto fileextension = splitfilename[splitfilename.size()-1];
         //auto fileextension = *(splitfilename.end()-1);
         #ifdef DEBUG
@@ -430,14 +346,23 @@ bool evaluateCommand(std::string cmd){
             std::cout << fileextension << std::endl;
             std::cout << filename << std::endl;
         #endif
-        
-        selection.addImage(filename);
+        // build full pathname
+        auto completeFileName = stringop::trimString(currentPath + filename);
+        auto exists = filesys::fileExists(completeFileName);
+        // file existent?
+        if (!exists){
+            std::cout << completeFileName << " does not exist!\n";
+        }else
+            selection.addImage(completeFileName);
         return true;
     } else if (base == (rootCommand+" remove")){
         std::string index;
         bool gotValue = paramParser.getParameter("index", index, "i");
         if (!gotValue)
             return false;
+        #ifdef DEBUG
+        std::cout << index << std::endl;
+        #endif
         int index_from_string = std::stoi(index);
         selection.removeImage(index_from_string);
         return true;
@@ -466,7 +391,7 @@ int main(int, char**) {
     do{
         std::cout << "\033[1;32m<" << currentPath << ">: \033[0m";
         std::getline(std::cin, lastInput);
-        lastInput = trimString(lastInput);
+        lastInput = stringop::trimString(lastInput);
         if (lastInput == quitCommand)
             break;
         

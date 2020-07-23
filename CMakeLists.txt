@@ -5,7 +5,14 @@ add_subdirectory(lib/pixel_reader)
 
 add_executable(pov_system main.cpp)
 
-target_link_libraries(pov_system PRIVATE pixel_reader)
+add_library(
+    imageselection
+    imageselection.cpp
+    imageselection.h
+)
+
+target_link_libraries(imageselection PRIVATE pixel_reader)
+target_link_libraries(pov_system PUBLIC imageselection)
 
 add_library(
     filesys
@@ -14,3 +21,20 @@ add_library(
 )
 
 target_link_libraries(pov_system PRIVATE filesys)
+
+add_library(
+    stringop
+    stringop.cpp
+    stringop.h
+)
+
+target_link_libraries(pov_system PUBLIC stringop)
+
+add_library(
+    commandparser
+    commandparser.cpp
+    commandparser.h
+)
+
+target_link_libraries(commandparser PUBLIC stringop)
+target_link_libraries(pov_system PUBLIC commandparser)
