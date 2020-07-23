@@ -1,11 +1,13 @@
+#include "ctype.h"
+
 //********Bluetooth****************************************************************************************
 #include <SoftwareSerial.h> 
-SoftwareSerial MyBlue(2, 3); // RX | TX 
+SoftwareSerial MyBlue(2,3); // RX | TX 
 
 //********LED STRIP**********************************************************************************
 #include <Adafruit_NeoPixel.h>
 #define PIN            6 
-#define NUMPIXELS      4
+#define NUMPIXELS      10
 Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN);
 
 //********Speed*******************************************************************************************
@@ -40,47 +42,26 @@ float yaw;
 
 //********STEPS***************************************************************************************
 int stepDeg = 90 / NUMPIXELS ;
-int quads [4][6/*NUMPIXELS*/][6/*NUMPIXELS*/] = {
-                        //Quad 1
-                        {
-                          {1,0,0,0,0,0},
-                          {1,0,0,0,0,0},
-                          {1,0,0,0,0,0},
-                          {1,0,0,0,0,0},
-                          {1,0,0,0,0,0},
-                          {1,0,0,0,0,0},
-                        },
-                        //Quad 2
-                        {
-                          {0,1,0,0,0,0},
-                          {0,1,0,0,0,0},
-                          {0,1,0,0,0,0},
-                          {0,1,0,0,0,0},
-                          {0,1,0,0,0,0},
-                          {0,1,0,0,0,0},
-                          
-                        },
-                        //Quad 3
-                        {
-                          {0,0,1,0,0,0},
-                          {0,0,1,0,0,0},
-                          {0,0,1,0,0,0},
-                          {0,0,1,0,0,0},
-                          {0,0,1,0,0,0},
-                          {0,0,1,0,0,0},
-                        },
-                        //Quad 4
-                        {
-                          {0,0,0,1,0,0},
-                          {0,0,0,1,0,0},
-                          {0,0,0,1,0,0},
-                          {0,0,0,1,0,0},
-                          {0,0,0,1,0,0},
-                          {0,0,0,1,0,0},
-                        }
-                      };
-    int yawModQuad; //index of current quadrant
-    int yawModDeg; //index of line in quadrant
+int quads [4][NUMPIXELS][NUMPIXELS][3];
+int yawDivQuad; //index of current quadrant
+int yawDivDeg; //index of line in quadrant
+
+
+//******Yaw**********************************************************************************
+//Calculates the current angle of the rotation 0->180°, -180°<-0
+bool CalcYaw(){
+  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet    
+    // get current angle
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
+    yaw = ypr[0] * 180/M_PI;
+    
+    return true;
+  }
+  return false;
+}
+
 
 void setup() {
   Serial.begin(115200);
@@ -95,6 +76,7 @@ void setup() {
 
   
   //********GYRO***************************************************************************************
+  // Source: https://github.com/jrowberg/i2cdevlib.git
   // join I2C bus (I2Cdev library doesn't do this automatically)
   #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
       Wire.begin();
@@ -143,19 +125,21 @@ void setup() {
   }
 }
 
+
 void loop() {  
   if (MyBlue.available()>0) {
-    String data=MyBlue.readString(); //reading the data from the bluetooth module
-    Serial.println("Received Data: " + data); 
+    String data=MyBlue.readString(); //reading the data from the bluetooth Divule
+    Serial.println("received data: " + data);
+    
+    pixels.setPixelColor(7, 255,0,0);
+    pixels.setPixelColor(8, 255,0,0);
+    pixels.setPixelColor(9, 255,0,0);
+    pixels.setPixelColor(10, 255,0,0);
+    delay(1000);
+    pixels.clear();
   }  
-    
-  if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet    
-    // get current angle
-    mpu.dmpGetQuaternion(&q, fifoBuffer);
-    mpu.dmpGetGravity(&gravity, &q);
-    mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-    yaw = ypr[0] * 180/M_PI;
-    
+  if(CalcYaw()); 
+  {    
     Serial.print("ypr\t");
     Serial.println(yaw);
 
@@ -168,22 +152,66 @@ void loop() {
       finishTime = millis();
       delayTime = (finishTime - startTime) / 360 * stepDeg;
     }
-    yawModQuad = (int)yaw / 90;
-    if(yaw < 0){
-      if(yawModQuad == -1) yawModQuad = 2;
-      if(yawModQuad == 0) yawModQuad = 3;
-    }
 
-    Serial.print("modQuad\t");
-    Serial.println(yawModQuad);
+    /* Quadrants:
+        Q1 = 0 | Q2 = 1
+        -------|-------
+        Q3 = 2 | Q4 = 4 
+     */
+    yawDivQuad = (int)yaw / 90;
+    if(yaw >= 0 && yawDivQuad == 0) yawDivQuad = 1;
+    else if(yaw >= 0 && yawDivQuad == 1) yawDivQuad = 3;
+    else if(yaw < 0 && yawDivQuad == 0) yawDivQuad = 0;
+    else if(yaw < 0 && yawDivQuad == -1) yawDivQuad = 2;
+
+    //Serial.print("DivQuad\t");
+    //Serial.println(yawDivQuad);
     
-    yawModDeg = (int)yaw / stepDeg;
-    
-    for(int i = 0; i< NUMPIXELS ; i++){
-      if(quads[yawModQuad][i][yawModDeg] > 0){
-          pixels.setPixelColor(i, 255,255,255);
-        }
+    yawDivDeg = (int)yaw / stepDeg;
+
+    //pov
+    //for(int i = 0; i< NUMPIXELS ; i++){
+      int r = 250;
+      int g = 250;
+      int b = 250;
+      int j;
+      int k;
+      if(yaw >= 0 && yaw < 18) {
+        j = 0;
+        k = 1;
+      }else if(yaw >= 18 && yaw < 36) {
+        j = 2;
+        k = 3;
+      }else if(yaw >= 36 && yaw < 54) {
+        j = 4;
+        k = 5;
+      }else if(yaw >= 54 && yaw < 72) {
+        j = 6;
+        k = 7;
+      }else if(yaw >= 72 && yaw < 90) {
+        j = 8;
+        k = 9;
+      }else if(yaw < 0 && yaw >= -18) {
+        j = 0;
+        k = 1;
+      }else if(yaw < -18 && yaw >= -36) {
+        j = 2;
+        k = 3;
+      }else if(yaw < -36 && yaw >= -54) {
+        j = 4;
+        k = 5;
+      }else if(yaw < -54 && yaw >= -72) {
+        j = 6;
+        k = 7;
+      }else if(yaw < -72 && yaw >= -90) {
+        j = 8;
+        k = 9;
       }
-    }
-    pixels.show();
+      pixels.setPixelColor(j, r,g,b);
+      pixels.setPixelColor(k, r,g,b);
+    //}
+  }
+  pixels.show();
+  delayMicroseconds(0);
+  pixels.clear();
 }
