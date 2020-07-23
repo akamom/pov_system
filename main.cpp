@@ -7,7 +7,8 @@ TODO: Console Farben testen und vllt sogar rausnehmen
 TODO: list files in directory
 TODO: Bluetooth?
 TODO: dirent.h auf Windows ausprobieren (list items in directory)
-TODO: parameter like onlypng (with no value) or somth for dir coommand so that only png is listed
+TODO: parameter like onlypng (with no value) or somth for dir coommand so that only png is listed (or for removing all selected)
+TODO: parameter sollten entweder so "set=" oder auch so "s=" ansprechbar sein
 */
 
 #include <iostream>
