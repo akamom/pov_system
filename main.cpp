@@ -16,17 +16,18 @@ TODO: parameter like onlypng (with no value) or somth for dir coommand so that o
 #include <Map>
 // stat works on unix, linux and windows
 #include <sys/stat.h>
-<<<<<<< HEAD
-=======
-// #include <dirent.h>
->>>>>>> 42586cb9005605e06c4b144833c4af91941f5c79
-#include "resources/dirent.h"
 // only available in c++ 17 and upgraded compiler
 // #include <filesystem>
 
 // #include <IOKit>
 
-// if 'debug' more verbose console
+#ifdef _WIN32 || _WIN64
+    #include "resources/dirent.h"
+#elif __APPLE__ || __MACH__ || __linux__
+    #include <dirent.h>
+#endif
+
+// if 'DEBUG' more verbose console
 #define DEBUG
 
 // key: commandname, value: description, parameterlist
@@ -80,23 +81,24 @@ void listItemsInDirectoryAlt(std::string path){
         std::cout << "items in directory " << path << std::endl;
         auto counter = 0;
         while ((ent = readdir (dir)) != NULL) {
-            //printf ("%s\n", ent->d_name);
-            //std::cout << ent->d_name << std::endl;
             auto filename = ent->d_name;
-            auto is_dir = ent->d_type == 16384;
-            if (is_dir){
-                std::cout << "\033[1;34m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
-            }else{
-                std::ostringstream os;
-                os << path << filename;
-                auto is_png = isPngFile(os.str());
-                if(is_png){
-                    std::cout << "\033[1;31m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
-                }else{
-                    std::cout << "\033[1;30m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
-                }
+            switch (ent->d_type) {
+                case DT_DIR:
+                    // Directory
+                    std::cout << "\033[1;34m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
+                    break;
+                default:
+                    // all other than directory case DT_REG for regular file
+                    std::ostringstream os;
+                    os << path << filename;
+                    auto is_png = isPngFile(os.str());
+                    if(is_png){
+                        std::cout << "\033[1;31m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
+                    }else{
+                        std::cout << "\033[1;30m" << counter << ":\t" << filename << "\t" << "\033[0m" << std::endl;
+                    }
+                    break;
             }
-            //printf("%5d%10s%10s\n", counter , ent->d_name, ent->d_type);
             ++counter;
         }
         closedir (dir);
@@ -107,16 +109,6 @@ void listItemsInDirectoryAlt(std::string path){
         std::cout << "Error listing items!\n";
     }
 }
-
-// namespace fs = std::filesystem;
-/*void listItemsInDirectory(std::string dir){
-    auto counter = 0;
-    std::filesystem::create_directory(dir);
-    std::cout << "items in directory " << dir << std::endl;
-    for (const auto &entry : std::filesystem::directory_iterator(dir)){
-        std::cout << counter << ": " << entry.path() << std::endl;
-    }
-}*/
 
 // https://stackoverflow.com/questions/18100097/portable-way-to-check-if-directory-exists-windows-linux-c
 inline bool directoryExists(const std::string &dir){
@@ -265,6 +257,7 @@ public:
         // add to selection
         //m_pixelSelection.insert({completeFileName, pixels});
         m_pixelSelection.insert({completeFileName, transformed});
+        std::cout << "added image " << fileName << " to selection\n";
     }
     void addImage(const std::string fileName, const int atIndex){}
     void removeImage(const std::string fileName){}
@@ -277,7 +270,8 @@ public:
         for(std::map<std::string, std::string>::iterator it = m_pixelSelection.begin(); it != m_pixelSelection.end(); ++it){
             if (atIndex == index){
                 m_pixelSelection.erase(it);
-                break;
+                std::cout << "removed image " << it->first << " from selection\n";
+                return;
             }
             ++index;
         }
@@ -393,7 +387,9 @@ private:
                 value = "NONE";
             else
                 value = trimString(paramSplit.at(1));
+            #ifdef DEBUG
             std::cout << "found Parameter: " << name << "='" << value << "'"<< std::endl;
+            #endif
             m_parameters.insert({name, value});
         }
     }
@@ -493,9 +489,11 @@ bool evaluateCommand(std::string cmd){
         auto splitfilename = split(filename, ".");
         auto fileextension = splitfilename[splitfilename.size()-1];
         //auto fileextension = *(splitfilename.end()-1);
+        #ifdef DEBUG
         for (auto a : splitfilename){
             std::cout << a << std::endl;
         }
+        #endif
         if (fileextension != "png")
             filename += ".png";
         #ifdef DEBUG
