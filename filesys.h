@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <sstream>
+#include <string.h>
 // only available in c++ 17 and upgraded compiler
 // #include <filesystem>
 
