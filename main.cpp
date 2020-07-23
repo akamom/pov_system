@@ -8,7 +8,7 @@ TODO: list files in directory
 TODO: Bluetooth?
 TODO: dirent.h auf Windows ausprobieren (list items in directory)
 TODO: parameter like onlypng (with no value) or somth for dir coommand so that only png is listed (or for removing all selected)
-TODO: parameter sollten entweder so "set=" oder auch so "s=" ansprechbar sein
+x TODO: parameter sollten entweder so "set=" oder auch so "s=" ansprechbar sein
 */
 
 #include <iostream>
@@ -36,7 +36,11 @@ typedef std::map<std::string, std::pair<std::string, std::vector<std::string>>> 
 
 // current path
 // TODO: hier noch einen standart pfad angeben!
+#ifdef DEBUG
 std::string currentPath = "/Users/i519401/Development/personal/C++/VPRProjekt/pov_system/resources/";
+#else
+std::string currentPath = "NO PATH";
+#endif
 // all commands will be <rootCommand> + <command>
 const std::string rootCommand = "pov";
 const std::string quitCommand = "q";
@@ -339,13 +343,19 @@ public:
 
     ~ParameterParser_c(){}
 
-    bool getParameter(std::string param_name, std::string &param_value) const{
+    bool getParameter(std::string param_name, std::string &param_value, std::string alt_param_name = "") const{
         if (m_parameters.empty())
             return false;
         std::map<std::string, std::string>::const_iterator it = m_parameters.find(param_name); //m_parameters.at(param_name);
         // meaning key non existent
         if (it == m_parameters.end()){
-            std::cout << "parameter " << param_name << " does not exist!\n";
+            it = m_parameters.find(alt_param_name);
+            auto alt_param_empty = alt_param_name.empty();
+            if (!alt_param_empty && it != m_parameters.end()){
+                param_value = it->second;
+                return true;
+            }
+            std::cout << "parameter " << param_name << (alt_param_empty ? "" : " or alternatively ") << (alt_param_empty ? "" : alt_param_name) <<  " does not exist!\n";
             return false;
         }
         param_value = it->second;
@@ -433,10 +443,11 @@ void gotoDirectory(char* dir){
 // key: string as command, value: string as description
 cmdMap_t commandMap = {
     {"help", {"lists all commands", {}}},
-    {"dir", {"sets the current working path or lists items in current dir", {"optional: <set=[path]>: path as value, sets working dir"}}},
-    {"add", {"adds image to selection", {"mandatory: <file=[filename]>: file in current path", "optional: <index=[index]>: at which index to insert"}}},
-    {"remove", {"removes image from selection either by index or by name", {}}},
-    {"status", {"lists all selected images and index", {}}}
+    {"dir", {"sets the current working path or lists items in current dir", {"optional: <set/s=[path]>: path as value, sets working dir"}}},
+    {"add", {"adds image to selection", {"mandatory: <file/f=[filename]>: file in current path", "optional: <index/i=[index]>: at which index to insert"}}},
+    {"remove", {"removes image from selection either by index or by name", {"mandatory: <index/i=[index]>: which index to delete from selection"}}},
+    {"status", {"lists all selected images and index", {}}},
+    {"start", {"uploads selection to arduino", {}}}
 };
 
 void printHelp(){
@@ -467,7 +478,7 @@ bool evaluateCommand(std::string cmd){
         return true;
     } else if (base == (rootCommand+" dir")){
         std::string path = "";
-        bool gotValue = paramParser.getParameter("set", path);
+        bool gotValue = paramParser.getParameter("set", path, "s");
         // if error, parameter was not found, meaning invalid parameter command
         if (gotValue){
             // set path param passed
@@ -484,7 +495,7 @@ bool evaluateCommand(std::string cmd){
         return true;
     } else if (base == (rootCommand+" add")){
         std::string filename = "";
-        bool gotValue = paramParser.getParameter("file", filename);
+        bool gotValue = paramParser.getParameter("file", filename, "f");
         if (!gotValue)
             return false;
         auto splitfilename = split(filename, ".");
@@ -506,7 +517,7 @@ bool evaluateCommand(std::string cmd){
         return true;
     } else if (base == (rootCommand+" remove")){
         std::string index;
-        bool gotValue = paramParser.getParameter("i", index);
+        bool gotValue = paramParser.getParameter("index", index, "i");
         if (!gotValue)
             return false;
         int index_from_string = std::stoi(index);
@@ -514,6 +525,9 @@ bool evaluateCommand(std::string cmd){
         return true;
     } else if (base == (rootCommand+" status")){
         selection.printSelection();
+        return true;
+    } else if (base == (rootCommand+" start")){
+        std::cout << "starting upload to arduino\n";
         return true;
     }
 
@@ -524,32 +538,6 @@ int main(int, char**) {
     if (os > 4)
         return 1;
     setCommandIdentifiers();
-
-    /*
-    // bilddaten auslesen
-    auto pixels = std::vector<color>();
-    bool err = pixel::decodeWithState("C:/Users/olitw/Downloads/password-manager-icon.png", pixels);
-    
-    // print all pixels
-    //for(auto col : pixels){
-    //    col.print();
-    //}
-    listItemsInDirectory();
-    */
-
-    //for (auto str : split("  pov    is coool", " ")){
-    //    std::cout << "'" << str << "'\n";
-    //}
-
-    /*
-    std::string pat = "D:\\1STUDIUM\\Semester3_klausuren.pdf";
-    correctPath(pat);
-    std::cout << fileExists(pat) << std::endl;
-    std::cout << fileExists("D:/1STUDIUM/Semester3_klauafqfsuren.pdf") << std::endl;
-    std::cout << directoryExists("D:/1STUDIUM") << std::endl;
-    std::cout << directoryExists("D:/1STUDIUM qgfqg") << std::endl;
-    return 1;
-    */
 
     std::cout << "\033[1m >>>>> POV Enviroment Start\n";
     std::cout << "enter '"<< quitCommand <<"' to quit. enter 'pov help' to list available commands\033[0m\n";
@@ -563,7 +551,6 @@ int main(int, char**) {
         if (lastInput == quitCommand)
             break;
         
-        //TODO: bearbeitung des commands
         auto cmdfound = evaluateCommand(lastInput);
         if (!cmdfound)
             std::cout << "Command "<< lastInput <<" not found\n";
